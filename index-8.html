@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="es"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>RETO V2</title>
+<style>
+body{margin:0;font-family:Arial;background:#eef1f5;color:#172033}.app{max-width:430px;min-height:100vh;margin:auto;background:white}.s{display:none;padding:24px}.on{display:block}header{text-align:center;padding:28px 10px}.logo{font-size:42px;font-weight:900}button{width:100%;padding:15px;margin:7px 0;border:0;border-radius:14px;font-weight:700;font-size:16px}.p{background:#ef3340;color:white}.b{background:#2589f5;color:white}.l{background:#edf0f4}input{width:100%;padding:13px;box-sizing:border-box;border:1px solid #ccd3dd;border-radius:10px;margin:6px 0 12px}.card{background:#f7f8fa;border-radius:15px;padding:15px;margin:12px 0}.msg{padding:12px;border-radius:10px;margin:10px 0;background:#eef8f2;color:#176d42}.err{padding:12px;border-radius:10px;margin:10px 0;background:#fff0f1;color:#a71927}.bar{height:12px;background:#21b66f;width:0}.track{height:12px;background:#e1e5ea;border-radius:20px;overflow:hidden}.small{font-size:13px;color:#687386}
+</style></head><body><div class="app">
+<section id="auth" class="s on"><header><div class="logo">🔥 RETO</div><div>Pequeños hábitos, grandes cambios.</div></header>
+<label>Email</label><input id="email" type="email" placeholder="tu@email.com"><label>Contraseña</label><input id="pass" type="password" placeholder="Mínimo 6 caracteres">
+<button class="p" onclick="signup()">CREAR CUENTA</button><button class="b" onclick="login()">INICIAR SESIÓN</button><div id="ae"></div></section>
+
+<section id="home" class="s"><header><div class="logo">🔥 RETO</div><div id="who" class="small"></div></header>
+<button class="p" onclick="show('create')">CREAR UN RETO</button><button class="b" onclick="mine()">MIS RETOS</button><button class="l" onclick="logout()">CERRAR SESIÓN</button><div id="he"></div></section>
+
+<section id="create" class="s"><button class="l" onclick="show('home')">← Volver</button><h2>Crear un reto</h2>
+<label>Nombre</label><input id="name" value="30 días de entrenamiento"><label>Duración</label><input id="days" type="number" value="30"><label>Objetivo diario</label><input id="goal" value="Entrenar al menos 30 minutos">
+<button class="p" onclick="create()">CREAR RETO 🔥</button><div id="ce"></div></section>
+
+<section id="created" class="s"><h2>🎉 ¡Reto creado!</h2><div class="card"><b>Código de invitación</b><h2 id="code"></h2></div><button class="b" onclick="openChallenge(current)">VER MI RETO</button><button class="l" onclick="show('home')">Inicio</button></section>
+
+<section id="list" class="s"><button class="l" onclick="show('home')">← Inicio</button><h2>Mis retos</h2><div id="items"></div></section>
+
+<section id="challenge" class="s"><button class="l" onclick="show('home')">← Inicio</button><h2 id="ct"></h2><p id="cg" class="small"></p>
+<div class="card"><b id="daysdone"></b><div class="track"><div id="bar" class="bar"></div></div><p id="pct" class="small"></p></div>
+<div class="card">🔥 Racha: <b id="streak">0</b><br>✅ Cumplidos: <b id="done">0</b><br>📅 Total: <b id="total">0</b></div>
+<button id="check" class="p" onclick="checkin()">¡CUMPLÍ HOY! ✅</button><div id="chm"></div></section>
+</div>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>
+const client=supabase.createClient("https://opofobwyofredhwaixky.supabase.co","sb_publishable_V5QjCN1DUx--he_tpv15vw_3BfDZyn1");
+let user=null,current=null;
+function show(id){document.querySelectorAll(".s").forEach(x=>x.classList.remove("on"));document.getElementById(id).classList.add("on")}
+function out(id,t,e=false){document.getElementById(id).innerHTML='<div class="'+(e?'err':'msg')+'">'+t+'</div>'}
+async function init(){let r=await client.auth.getSession();if(r.data.session){user=r.data.session.user;await profile();home()}}
+async function profile(){let q=await client.from("profiles").select("id").eq("id",user.id).maybeSingle();if(!q.data){let u=(user.email||"usuario").split("@")[0]+"_"+user.id.slice(0,5);await client.from("profiles").insert({id:user.id,username:u})}}
+function home(){document.getElementById("who").textContent="Sesión: "+user.email;show("home")}
+async function signup(){let email=document.getElementById("email").value.trim(),password=document.getElementById("pass").value;if(!email||password.length<6)return out("ae","Email y contraseña de al menos 6 caracteres.",true);let r=await client.auth.signUp({email,password});if(r.error)return out("ae",r.error.message,true);if(r.data.session){user=r.data.user;await profile();home()}else out("ae","Cuenta creada. Revisá tu correo si pide confirmación.")}
+async function login(){let email=document.getElementById("email").value.trim(),password=document.getElementById("pass").value,r=await client.auth.signInWithPassword({email,password});if(r.error)return out("ae",r.error.message,true);user=r.data.user;await profile();home()}
+async function logout(){await client.auth.signOut();user=null;show("auth")}
+async function create(){let name=document.getElementById("name").value.trim(),days=Number(document.getElementById("days").value),goal=document.getElementById("goal").value.trim(),code=Math.random().toString(36).slice(2,8).toUpperCase();let r=await client.from("challenges").insert({creator_id:user.id,name,description:goal,duration_days:days,invite_code:code}).select().single();if(r.error)return out("ce",r.error.message,true);current=r.data;let p=await client.from("participants").insert({challenge_id:current.id,user_id:user.id});if(p.error)return out("ce",p.error.message,true);document.getElementById("code").textContent=current.invite_code;show("created")}
+async function mine(){let r=await client.from("participants").select("challenge_id,challenges(*)").eq("user_id",user.id);if(r.error)return out("he",r.error.message,true);let box=document.getElementById("items");box.innerHTML="";if(!r.data.length)box.innerHTML='<div class="card">Todavía no participás en retos.</div>';r.data.forEach(x=>{let b=document.createElement("button");b.className="b";b.textContent="🔥 "+x.challenges.name;b.onclick=()=>openChallenge(x.challenges);box.appendChild(b)});show("list")}
+async function openChallenge(c){current=c;document.getElementById("ct").textContent=c.name;document.getElementById("cg").textContent=c.description||"";document.getElementById("total").textContent=c.duration_days;await render();show("challenge")}
+async function render(){let r=await client.from("checkins").select("checkin_date").eq("challenge_id",current.id).eq("user_id",user.id).order("checkin_date");if(r.error)return out("chm",r.error.message,true);let a=r.data,n=a.length,p=Math.min(100,Math.round(n/current.duration_days*100));document.getElementById("done").textContent=n;document.getElementById("daysdone").textContent=n+" de "+current.duration_days+" días";document.getElementById("pct").textContent=p+"% completado";document.getElementById("bar").style.width=p+"%";let today=new Date().toISOString().slice(0,10),todayDone=a.some(x=>x.checkin_date===today);document.getElementById("check").disabled=todayDone||n>=current.duration_days;document.getElementById("check").textContent=n>=current.duration_days?"🏆 RETO COMPLETADO":todayDone?"✅ YA CUMPLISTE HOY":"¡CUMPLÍ HOY! ✅";let set=new Set(a.map(x=>x.checkin_date)),d=new Date(),s=0;for(let i=0;i<365;i++){let x=new Date(d);x.setDate(d.getDate()-i);let k=x.toISOString().slice(0,10);if(set.has(k))s++;else if(i>0)break}document.getElementById("streak").textContent=s}
+async function checkin(){let today=new Date().toISOString().slice(0,10),r=await client.from("checkins").insert({challenge_id:current.id,user_id:user.id,checkin_date:today});if(r.error)return out("chm",r.error.message,true);out("chm","🔥 ¡Cumplimiento guardado en Supabase!");await render()}
+init();
+</script></body></html>
